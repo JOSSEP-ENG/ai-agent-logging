@@ -1,26 +1,41 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Bot, Mail, Lock, ArrowRight, Sparkles } from 'lucide-react';
 import { Button, Input } from '@/components/ui';
-import { authApi, ApiError } from '@/lib/api';
+import { ApiError } from '@/lib/api';
+import { useAuthStore } from '@/lib/store';
 
 export default function LoginPage() {
   const router = useRouter();
+  const { login, isAuthenticated, checkAuth } = useAuthStore();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  
+
+  // 인증 상태 체크 (최초 1회만)
+  useEffect(() => {
+    checkAuth();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 이미 로그인된 경우 채팅 페이지로 리다이렉트
+  useEffect(() => {
+    if (isAuthenticated) {
+      router.push('/chat');
+    }
+  }, [isAuthenticated, router]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
-    
+
     try {
-      await authApi.login(email, password);
+      await login(email, password);
       router.push('/chat');
     } catch (err) {
       if (err instanceof ApiError) {
@@ -142,17 +157,6 @@ export default function LoginPage() {
             <Link href="/auth/register" className="text-accent-400 hover:text-accent-300 font-medium">
               회원가입
             </Link>
-          </div>
-          
-          {/* 테스트 계정 안내 */}
-          <div className="mt-8 p-4 bg-dark-800/50 rounded-lg border border-dark-700">
-            <p className="text-sm text-dark-400 mb-2">테스트 계정</p>
-            <p className="text-sm text-dark-300">
-              인증 없이 사용하려면{' '}
-              <Link href="/chat" className="text-accent-400 hover:underline">
-                바로 채팅 시작
-              </Link>
-            </p>
           </div>
         </div>
       </div>

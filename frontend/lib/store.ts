@@ -27,9 +27,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   
   login: async (email, password) => {
     const response = await authApi.login(email, password);
-    set({ 
-      user: response.user as User, 
+    set({
+      user: response.user as User,
       isAuthenticated: true,
+      isLoading: false,
     });
   },
   

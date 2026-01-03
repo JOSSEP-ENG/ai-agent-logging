@@ -194,37 +194,45 @@ export const authApi = {
 
 export const chatApi = {
   async getSessions(limit = 20): Promise<{ sessions: Session[]; total: number }> {
-    return fetchApi(`/api/chat/sessions?limit=${limit}`);
+    return fetchApi(`/api/chat/auth/sessions?limit=${limit}`);
   },
-  
+
   async createSession(title?: string): Promise<Session> {
-    return fetchApi('/api/chat/sessions', {
+    return fetchApi('/api/chat/auth/sessions', {
       method: 'POST',
       body: JSON.stringify({ title }),
     });
   },
-  
+
   async getSession(sessionId: string): Promise<{ session: Session; messages: Message[] }> {
-    return fetchApi(`/api/chat/sessions/${sessionId}`);
+    return fetchApi(`/api/chat/auth/sessions/${sessionId}`);
   },
-  
+
   async deleteSession(sessionId: string): Promise<void> {
-    await fetchApi(`/api/chat/sessions/${sessionId}`, {
+    await fetchApi(`/api/chat/auth/sessions/${sessionId}`, {
       method: 'DELETE',
     });
   },
-  
+
   async sendMessage(sessionId: string, message: string): Promise<ChatResponse> {
-    return fetchApi(`/api/chat/sessions/${sessionId}/messages`, {
+    return fetchApi(`/api/chat/auth/sessions/${sessionId}/messages`, {
       method: 'POST',
       body: JSON.stringify({ message }),
     });
   },
-  
+
   async quickChat(message: string): Promise<ChatResponse> {
-    return fetchApi('/api/chat/quick', {
+    // 첫 메시지의 앞 50자를 제목으로 사용
+    const title = message.length > 50 ? message.substring(0, 50) + '...' : message;
+
+    return fetchApi('/api/chat/auth/sessions', {
       method: 'POST',
-      body: JSON.stringify({ message }),
+      body: JSON.stringify({ title }),
+    }).then(async (session: Session) => {
+      return fetchApi(`/api/chat/auth/sessions/${session.id}/messages`, {
+        method: 'POST',
+        body: JSON.stringify({ message }),
+      });
     });
   },
 };

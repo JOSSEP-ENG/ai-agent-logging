@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { 
-  Plus, 
-  MessageSquare, 
-  Settings, 
+import {
+  Plus,
+  MessageSquare,
+  Settings,
   User,
   LogOut,
   Database,
@@ -18,24 +19,44 @@ import { Button } from '@/components/ui';
 import { chatApi, Session } from '@/lib/api';
 import { formatDate, truncate } from '@/lib/utils';
 import { cn } from '@/lib/utils';
+import { useAuthStore } from '@/lib/store';
 
 interface ChatSidebarProps {
   currentSessionId?: string;
   onSessionSelect: (sessionId: string) => void;
   onNewChat: () => void;
+  onSessionsRefresh?: number;
 }
 
-export function ChatSidebar({ 
-  currentSessionId, 
-  onSessionSelect, 
+export function ChatSidebar({
+  currentSessionId,
+  onSessionSelect,
   onNewChat,
+  onSessionsRefresh,
 }: ChatSidebarProps) {
+  const router = useRouter();
+  const { isAuthenticated, user, logout, checkAuth } = useAuthStore();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  
+
+  // 로그인 상태에 따라 세션 로드
   useEffect(() => {
-    loadSessions();
-  }, []);
+    if (isAuthenticated) {
+      loadSessions();
+    } else {
+      setSessions([]);
+      setIsLoading(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated]);
+
+  // 외부에서 새로고침 요청 시 세션 로드
+  useEffect(() => {
+    if (onSessionsRefresh !== undefined && onSessionsRefresh > 0 && isAuthenticated) {
+      loadSessions();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onSessionsRefresh]);
   
   const loadSessions = async () => {
     try {
@@ -50,19 +71,24 @@ export function ChatSidebar({
   
   const handleDelete = async (e: React.MouseEvent, sessionId: string) => {
     e.stopPropagation();
-    
+
     if (!confirm('이 대화를 삭제하시겠습니까?')) return;
-    
+
     try {
       await chatApi.deleteSession(sessionId);
       setSessions(sessions.filter(s => s.id !== sessionId));
-      
+
       if (currentSessionId === sessionId) {
         onNewChat();
       }
     } catch (error) {
       console.error('Failed to delete session:', error);
     }
+  };
+
+  const handleLogout = () => {
+    logout();
+    router.push('/auth/login');
   };
   
   return (
@@ -141,14 +167,24 @@ export function ChatSidebar({
           <Shield className="w-4 h-4" />
           <span className="text-sm">관리자</span>
         </Link>
-        
-        <Link
-          href="/auth/login"
-          className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-dark-800 transition-colors text-dark-400 hover:text-dark-200"
-        >
-          <User className="w-4 h-4" />
-          <span className="text-sm">로그인</span>
-        </Link>
+
+        {isAuthenticated ? (
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-dark-800 transition-colors text-dark-400 hover:text-dark-200"
+          >
+            <LogOut className="w-4 h-4" />
+            <span className="text-sm">로그아웃</span>
+          </button>
+        ) : (
+          <Link
+            href="/auth/login"
+            className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-dark-800 transition-colors text-dark-400 hover:text-dark-200"
+          >
+            <User className="w-4 h-4" />
+            <span className="text-sm">로그인</span>
+          </Link>
+        )}
       </div>
     </aside>
   );
