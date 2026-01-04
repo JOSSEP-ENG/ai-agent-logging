@@ -158,12 +158,18 @@ class MySQLMCPClient(MCPClient):
                 
                 # 결과 가져오기
                 rows = await cursor.fetchall()
-                
-                # 딕셔너리 형태로 변환
-                result = [
-                    dict(zip(columns, row))
-                    for row in rows
-                ]
+
+                # 딕셔너리 형태로 변환 (datetime을 문자열로 변환)
+                result = []
+                for row in rows:
+                    row_dict = {}
+                    for col, val in zip(columns, row):
+                        # datetime 객체를 ISO 포맷 문자열로 변환
+                        if hasattr(val, 'isoformat'):
+                            row_dict[col] = val.isoformat()
+                        else:
+                            row_dict[col] = val
+                    result.append(row_dict)
                 
                 return ToolCallResult(
                     success=True,
