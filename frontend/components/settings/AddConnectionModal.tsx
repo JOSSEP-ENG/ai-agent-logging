@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { X } from 'lucide-react';
+import { X, Database, Cloud } from 'lucide-react';
 import { mcpApi } from '@/lib/api';
 
 interface Props {
@@ -9,9 +9,10 @@ interface Props {
   onSuccess: () => void;
 }
 
+type TabType = 'external' | 'custom';
+
 export function AddConnectionModal({ onClose, onSuccess }: Props) {
-  const [step, setStep] = useState<'type' | 'config' | 'test'>('type');
-  const [type, setType] = useState<string>('');
+  const [activeTab, setActiveTab] = useState<TabType>('external');
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [host, setHost] = useState('localhost');
@@ -30,7 +31,7 @@ export function AddConnectionModal({ onClose, onSuccess }: Props) {
     try {
       const connection = await mcpApi.createConnection(
         name,
-        type,
+        'mysql',
         { host, port: parseInt(port), database, read_only: readOnly },
         { username, password }
       );
@@ -53,10 +54,10 @@ export function AddConnectionModal({ onClose, onSuccess }: Props) {
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/80" onClick={onClose} />
 
-      <div className="relative bg-dark-800 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto m-4">
+      <div className="relative bg-dark-800 rounded-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto m-4">
         <div className="p-6">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold text-white">연결 추가</h2>
+            <h2 className="text-2xl font-bold text-white">MCP 서버 연결 추가</h2>
             <button
               onClick={onClose}
               className="text-dark-400 hover:text-white transition-colors"
@@ -65,31 +66,54 @@ export function AddConnectionModal({ onClose, onSuccess }: Props) {
             </button>
           </div>
 
-          {step === 'type' && (
-            <div className="space-y-4">
-              <p className="text-dark-400">연결 타입을 선택하세요:</p>
+          {/* 탭 메뉴 */}
+          <div className="flex gap-2 mb-6 border-b border-dark-700">
+            <button
+              onClick={() => setActiveTab('external')}
+              className={`
+                flex items-center gap-2 px-4 py-3 border-b-2 transition-colors
+                ${
+                  activeTab === 'external'
+                    ? 'border-accent-500 text-accent-400'
+                    : 'border-transparent text-dark-400 hover:text-dark-200'
+                }
+              `}
+            >
+              <Cloud className="w-5 h-5" />
+              <span className="font-medium">외부 MCP 서버</span>
+            </button>
 
-              <button
-                onClick={() => {
-                  setType('mysql');
-                  setStep('config');
-                }}
-                className="w-full p-4 border border-dark-700 rounded-lg hover:bg-dark-700 hover:border-accent-500 transition-colors text-left"
-              >
-                <h3 className="text-white font-semibold">MySQL 데이터베이스</h3>
-                <p className="text-dark-400 text-sm mt-1">
-                  MySQL 서버에 연결합니다
-                </p>
-              </button>
+            <button
+              onClick={() => setActiveTab('custom')}
+              className={`
+                flex items-center gap-2 px-4 py-3 border-b-2 transition-colors
+                ${
+                  activeTab === 'custom'
+                    ? 'border-accent-500 text-accent-400'
+                    : 'border-transparent text-dark-400 hover:text-dark-200'
+                }
+              `}
+            >
+              <Database className="w-5 h-5" />
+              <span className="font-medium">커스텀 MCP 서버</span>
+            </button>
+          </div>
+
+          {/* 외부 MCP 서버 탭 */}
+          {activeTab === 'external' && (
+            <div className="space-y-4">
+              <p className="text-dark-400 mb-4">
+                OAuth 인증을 통해 외부 서비스에 연결합니다
+              </p>
 
               <button
                 disabled
                 className="w-full p-4 border border-dark-700 rounded-lg opacity-50 cursor-not-allowed text-left"
               >
-                <h3 className="text-white font-semibold">
-                  Notion (준비 중)
-                </h3>
-                <p className="text-dark-400 text-sm mt-1">OAuth 인증</p>
+                <h3 className="text-white font-semibold">Notion (준비 중)</h3>
+                <p className="text-dark-400 text-sm mt-1">
+                  Notion 워크스페이스의 페이지와 데이터베이스를 조회합니다
+                </p>
               </button>
 
               <button
@@ -99,13 +123,37 @@ export function AddConnectionModal({ onClose, onSuccess }: Props) {
                 <h3 className="text-white font-semibold">
                   Google Calendar (준비 중)
                 </h3>
-                <p className="text-dark-400 text-sm mt-1">OAuth 인증</p>
+                <p className="text-dark-400 text-sm mt-1">
+                  Google 캘린더 일정을 조회합니다
+                </p>
+              </button>
+
+              <button
+                disabled
+                className="w-full p-4 border border-dark-700 rounded-lg opacity-50 cursor-not-allowed text-left"
+              >
+                <h3 className="text-white font-semibold">
+                  Google Drive (준비 중)
+                </h3>
+                <p className="text-dark-400 text-sm mt-1">
+                  Google 드라이브 파일을 검색하고 읽습니다
+                </p>
               </button>
             </div>
           )}
 
-          {step === 'config' && type === 'mysql' && (
+          {/* 커스텀 MCP 서버 탭 */}
+          {activeTab === 'custom' && (
             <div className="space-y-4">
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold text-white mb-2">
+                  MySQL 데이터베이스 연결
+                </h3>
+                <p className="text-dark-400 text-sm">
+                  MySQL 서버에 직접 연결하여 데이터를 조회합니다
+                </p>
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-dark-300 mb-2">
                   연결 이름 *
@@ -218,14 +266,7 @@ export function AddConnectionModal({ onClose, onSuccess }: Props) {
                 </div>
               )}
 
-              <div className="flex gap-4 pt-4">
-                <button
-                  onClick={() => setStep('type')}
-                  className="px-4 py-2 text-dark-300 hover:text-white hover:bg-dark-700 rounded-lg transition-colors"
-                >
-                  뒤로
-                </button>
-
+              <div className="flex justify-end pt-4">
                 <button
                   onClick={handleTest}
                   disabled={
@@ -235,7 +276,7 @@ export function AddConnectionModal({ onClose, onSuccess }: Props) {
                     !password ||
                     !database
                   }
-                  className="flex-1 px-4 py-2 bg-accent-500 hover:bg-accent-600 disabled:bg-dark-700 disabled:text-dark-500 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
+                  className="px-6 py-2 bg-accent-500 hover:bg-accent-600 disabled:bg-dark-700 disabled:text-dark-500 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
                 >
                   {isLoading ? '테스트 중...' : '테스트 및 저장'}
                 </button>
