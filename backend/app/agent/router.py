@@ -11,8 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import get_db
 from app.audit.service import AuditService
-from app.mcp_gateway.gateway import MCPGateway
-from app.mcp_gateway.router import get_gateway
+from app.mcp_gateway.gateway_manager import UserGatewayManager
+from app.mcp_gateway.router import get_gateway_manager
 from app.agent.service import AgentService, SimpleAgentService, Message
 from app.config import get_settings
 
@@ -61,7 +61,7 @@ class AgentStatusResponse(BaseModel):
 
 # ============ 헬퍼 함수 ============
 
-def get_agent_service(gateway: MCPGateway = Depends(get_gateway)):
+def get_agent_service(gateway_manager: UserGatewayManager = Depends(get_gateway_manager)):
     """Agent 서비스 인스턴스 반환"""
     settings = get_settings()
     
@@ -84,7 +84,7 @@ def get_agent_service(gateway: MCPGateway = Depends(get_gateway)):
 async def chat(
     request: ChatRequest,
     db: AsyncSession = Depends(get_db),
-    gateway: MCPGateway = Depends(get_gateway),
+    gateway_manager: UserGatewayManager = Depends(get_gateway_manager),
 ):
     """AI 채팅 메시지 처리
     
@@ -147,7 +147,7 @@ async def chat(
 async def chat_stream(
     request: ChatRequest,
     db: AsyncSession = Depends(get_db),
-    gateway: MCPGateway = Depends(get_gateway),
+    gateway_manager: UserGatewayManager = Depends(get_gateway_manager),
 ):
     """스트리밍 채팅 응답 (향후 구현)
     
@@ -174,7 +174,7 @@ async def chat_stream(
 
 @router.get("/status", response_model=AgentStatusResponse)
 async def get_agent_status(
-    gateway: MCPGateway = Depends(get_gateway),
+    gateway_manager: UserGatewayManager = Depends(get_gateway_manager),
 ):
     """Agent 상태 확인
     
@@ -194,7 +194,7 @@ async def get_agent_status(
 
 @router.post("/sync-tools")
 async def sync_tools(
-    gateway: MCPGateway = Depends(get_gateway),
+    gateway_manager: UserGatewayManager = Depends(get_gateway_manager),
 ):
     """Tool 목록 동기화
     

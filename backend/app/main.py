@@ -43,6 +43,14 @@ app.add_middleware(
 app.include_router(audit_router)
 app.include_router(mcp_router)
 
+# MCP Connections 라우터
+try:
+    from app.mcp_gateway.router_connections import router as mcp_connections_router
+    app.include_router(mcp_connections_router)
+    print("✅ MCP Connections router loaded")
+except Exception as e:
+    print(f"⚠️ MCP Connections router failed: {e}")
+
 # Agent 라우터 (Gemini 의존성 - 선택적)
 try:
     from app.agent import agent_router

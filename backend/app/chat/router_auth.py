@@ -13,8 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import get_db
 from app.models.user import User
 from app.chat.service import ChatService
-from app.mcp_gateway.router import get_gateway
-from app.mcp_gateway.gateway import MCPGateway
+from app.mcp_gateway.router import get_gateway_manager
+from app.mcp_gateway.gateway_manager import UserGatewayManager
 from app.auth.dependencies import get_current_user
 from app.config import get_settings
 
@@ -205,52 +205,55 @@ async def send_message(
     request: ChatMessageRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-    gateway: MCPGateway = Depends(get_gateway),
+    gateway_manager: UserGatewayManager = Depends(get_gateway_manager),
 ):
     """세션에 메시지 전송 (인증 필요)"""
     import time
     start_time = time.time()
-    
+
     chat_service = ChatService(db)
     user_id = str(current_user.id)
-    
+
     # 세션 확인 (본인 세션만)
     session = await chat_service.get_session(session_id, user_id)
     if not session:
         raise HTTPException(status_code=404, detail="세션을 찾을 수 없습니다")
-    
+
     # 사용자 메시지 저장
     user_msg = await chat_service.add_message(
         session_id=session_id,
         role="user",
         content=request.message,
     )
-    
+
     # 히스토리 로드
     history_messages = await chat_service.get_recent_messages(
         session_id=session_id,
         limit=chat_service.MAX_HISTORY_MESSAGES,
     )
-    
+
+    # 사용자별 Gateway 가져오기
+    user_gateway = await gateway_manager.get_user_gateway(current_user.id, db)
+
     # Agent 호출
     from app.agent.service import Message, SimpleAgentService
-    
+
     history = [
         Message(role=msg.role, content=msg.content)
         for msg in history_messages[:-1]
     ]
-    
+
     settings = get_settings()
     if settings.gemini_api_key:
         try:
             from app.agent.gemini_client import GeminiClient
             from app.agent.service import AgentService
             gemini = GeminiClient(settings.gemini_api_key)
-            agent = AgentService(gemini, gateway)
+            agent = AgentService(gemini, user_gateway)
         except Exception:
-            agent = SimpleAgentService(gateway)
+            agent = SimpleAgentService(user_gateway)
     else:
-        agent = SimpleAgentService(gateway)
+        agent = SimpleAgentService(user_gateway)
     
     response = await agent.process_message(
         user_message=request.message,

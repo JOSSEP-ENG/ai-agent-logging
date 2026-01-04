@@ -12,8 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import get_db
 from app.chat.service import ChatService
-from app.mcp_gateway.router import get_gateway
-from app.mcp_gateway.gateway import MCPGateway
+from app.mcp_gateway.router import get_gateway_manager
+from app.mcp_gateway.gateway_manager import UserGatewayManager
 from app.config import get_settings
 
 
@@ -258,7 +258,7 @@ async def send_message(
     session_id: UUID,
     request: ChatMessageRequest,
     db: AsyncSession = Depends(get_db),
-    gateway: MCPGateway = Depends(get_gateway),
+    gateway_manager: UserGatewayManager = Depends(get_gateway_manager),
 ):
     """세션에 메시지 전송 (AI 응답 포함)
     
@@ -391,7 +391,7 @@ async def get_messages(
 async def quick_chat(
     request: ChatMessageRequest,
     db: AsyncSession = Depends(get_db),
-    gateway: MCPGateway = Depends(get_gateway),
+    gateway_manager: UserGatewayManager = Depends(get_gateway_manager),
 ):
     """빠른 채팅 (세션 자동 생성)
     

@@ -160,26 +160,13 @@ async def get_all_mcp_connections(
     
     시스템에 등록된 모든 MCP 연결을 조회합니다.
     """
-    from app.mcp_gateway.router import get_gateway
-    
-    # Gateway에서 연결 목록 가져오기
+    # TODO: UserGatewayManager를 사용하여 모든 사용자의 연결 조회
+    # 현재는 DB에서 직접 조회
     try:
-        from app.mcp_gateway.router import _gateway
-        if _gateway is None:
-            return []
-        
-        connections = []
-        for conn_id, conn in _gateway._connections.items():
-            connections.append(MCPConnectionAdminResponse(
-                id=conn.id,
-                name=conn.name,
-                type=conn.type,
-                enabled=conn.enabled,
-                tools_count=len(conn.tools),
-                created_by=None,  # TODO: 생성자 추적
-            ))
-        
-        return connections
+        from app.mcp_gateway.connection_service import MCPConnectionService
+        service = MCPConnectionService(db)
+        # 모든 연결 조회 로직 필요 - 향후 구현
+        return []  # 임시로 빈 배열 반환
     except Exception:
         return []
 

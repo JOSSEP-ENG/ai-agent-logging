@@ -92,7 +92,18 @@ export interface MCPConnection {
   id: string;
   name: string;
   type: string;
-  tools_count: number;
+  description?: string;
+  is_active: boolean;
+  last_tested_at?: string;
+  last_test_status?: string;
+  created_at: string;
+}
+
+export interface ConnectionTestResult {
+  success: boolean;
+  message: string;
+  tools_count?: number;
+  error?: string;
 }
 
 // ============ API 에러 ============
@@ -240,27 +251,34 @@ export const chatApi = {
 // ============ MCP API ============
 
 export const mcpApi = {
-  async getConnections(): Promise<{ connections: MCPConnection[] }> {
+  async getUserConnections(): Promise<MCPConnection[]> {
     return fetchApi('/api/mcp/connections');
   },
-  
+
   async createConnection(
     name: string,
     type: string,
     config: Record<string, any>,
+    credentials: Record<string, any>,
   ): Promise<MCPConnection> {
     return fetchApi('/api/mcp/connections', {
       method: 'POST',
-      body: JSON.stringify({ name, type, config }),
+      body: JSON.stringify({ name, type, config, credentials }),
     });
   },
-  
+
   async deleteConnection(connectionId: string): Promise<void> {
     await fetchApi(`/api/mcp/connections/${connectionId}`, {
       method: 'DELETE',
     });
   },
-  
+
+  async testConnection(connectionId: string): Promise<ConnectionTestResult> {
+    return fetchApi(`/api/mcp/connections/${connectionId}/test`, {
+      method: 'POST',
+    });
+  },
+
   async getTools(): Promise<{ tools: any[] }> {
     return fetchApi('/api/mcp/tools');
   },
