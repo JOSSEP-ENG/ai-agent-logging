@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { LayoutWrapper } from '@/components/layout/LayoutWrapper';
 
 export const metadata: Metadata = {
   title: 'AI Platform',
@@ -14,7 +15,7 @@ export default function RootLayout({
   return (
     <html lang="ko" className="dark">
       <body className="min-h-screen bg-dark-900 text-dark-100 antialiased">
-        {children}
+        <LayoutWrapper>{children}</LayoutWrapper>
       </body>
     </html>
   );
