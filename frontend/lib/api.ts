@@ -236,11 +236,11 @@ export const chatApi = {
     // 첫 메시지의 앞 50자를 제목으로 사용
     const title = message.length > 50 ? message.substring(0, 50) + '...' : message;
 
-    return fetchApi('/api/chat/auth/sessions', {
+    return fetchApi<Session>('/api/chat/auth/sessions', {
       method: 'POST',
       body: JSON.stringify({ title }),
     }).then(async (session: Session) => {
-      return fetchApi(`/api/chat/auth/sessions/${session.id}/messages`, {
+      return fetchApi<ChatResponse>(`/api/chat/auth/sessions/${session.id}/messages`, {
         method: 'POST',
         body: JSON.stringify({ message }),
       });
@@ -304,13 +304,19 @@ export const adminApi = {
     offset?: number;
     user_id?: string;
     tool_name?: string;
-  } = {}): Promise<{ logs: any[]; total: number }> {
+    status?: string;
+    start_date?: string;
+    end_date?: string;
+  } = {}): Promise<{ logs: any[]; total: number; limit: number; offset: number }> {
     const searchParams = new URLSearchParams();
     if (params.limit) searchParams.set('limit', params.limit.toString());
     if (params.offset) searchParams.set('offset', params.offset.toString());
     if (params.user_id) searchParams.set('user_id', params.user_id);
     if (params.tool_name) searchParams.set('tool_name', params.tool_name);
-    
+    if (params.status) searchParams.set('status', params.status);
+    if (params.start_date) searchParams.set('start_date', params.start_date);
+    if (params.end_date) searchParams.set('end_date', params.end_date);
+
     return fetchApi(`/api/admin/audit/logs?${searchParams}`);
   },
   
@@ -323,5 +329,47 @@ export const adminApi = {
       method: 'PATCH',
       body: JSON.stringify({ role }),
     });
+  },
+};
+
+// ============ User Profile API ============
+
+export interface UpdateProfileRequest {
+  name?: string;
+  email?: string;
+  avatar_url?: string;
+}
+
+export interface ChangePasswordRequest {
+  current_password: string;
+  new_password: string;
+}
+
+export interface UserActivity {
+  id: string;
+  type: 'login' | 'logout' | 'session_created' | 'settings_changed';
+  description: string;
+  timestamp: string;
+  ip_address?: string;
+  user_agent?: string;
+}
+
+export const userApi = {
+  async updateProfile(data: UpdateProfileRequest): Promise<User> {
+    return fetchApi('/api/auth/profile', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async changePassword(data: ChangePasswordRequest): Promise<void> {
+    return fetchApi('/api/auth/password', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async getActivity(limit = 10): Promise<UserActivity[]> {
+    return fetchApi(`/api/auth/activity?limit=${limit}`);
   },
 };
