@@ -1,7 +1,5 @@
 'use client';
 
-export const dynamic = 'force-dynamic';
-
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ChatMessages, ChatInput } from '@/components/chat';
@@ -94,6 +92,7 @@ export default function ChatPage() {
       } else {
         // 새 세션 생성 (quick chat)
         response = await chatApi.quickChat(content);
+        setCurrentSessionId(response.user_message.session_id);
       }
 
       // 실제 응답으로 메시지 업데이트
@@ -129,16 +128,27 @@ export default function ChatPage() {
   };
   
   return (
-    <div className="flex flex-col h-full">
-      <ChatMessages
-        messages={messages}
-        isLoading={isLoading}
+    <div className="flex h-screen bg-dark-900">
+      {/* 사이드바 */}
+      <ChatSidebar
+        currentSessionId={currentSessionId}
+        onSessionSelect={handleSessionSelect}
+        onNewChat={handleNewChat}
+        onSessionsRefresh={refreshKey}
       />
 
-      <ChatInput
-        onSend={handleSendMessage}
-        disabled={isLoading}
-      />
+      {/* 메인 채팅 영역 */}
+      <main className="flex-1 flex flex-col">
+        <ChatMessages
+          messages={messages}
+          isLoading={isLoading}
+        />
+
+        <ChatInput
+          onSend={handleSendMessage}
+          disabled={isLoading}
+        />
+      </main>
     </div>
   );
 }
