@@ -279,6 +279,8 @@ async def get_all_audit_logs(
                 "id": str(log.id),
                 "timestamp": log.timestamp.isoformat(),
                 "user_id": log.user_id,
+                "user_email": getattr(log, "user_email", None),  # JOIN으로 추가된 속성
+                "user_name": getattr(log, "user_name", None),    # JOIN으로 추가된 속성
                 "session_id": str(log.session_id) if log.session_id else None,
                 "user_query": log.user_query,
                 "tool_name": log.tool_name,

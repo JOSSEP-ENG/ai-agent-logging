@@ -2,10 +2,12 @@ import uuid
 from datetime import datetime
 from typing import Any, Dict, Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, or_
+from sqlalchemy import select, and_, or_, cast
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import text
 
 from app.models.audit import AuditLog, AuditStatus
+from app.models.user import User
 from app.audit.masking import DataMasker
 
 
@@ -125,7 +127,7 @@ class AuditService:
         offset: int = 0,
     ) -> List[AuditLog]:
         """감사 로그 조회 (필터링)
-        
+
         Args:
             user_id: 사용자 ID 필터
             tool_name: Tool 이름 필터
@@ -134,36 +136,54 @@ class AuditService:
             end_date: 종료 날짜
             limit: 조회 개수
             offset: 시작 위치
+
+        Returns:
+            AuditLog 리스트 (user_email, user_name 속성 추가됨)
         """
-        query = select(AuditLog)
+        # User 테이블과 JOIN하여 사용자 정보 가져오기
+        query = select(AuditLog, User).outerjoin(
+            User,
+            cast(AuditLog.user_id, UUID) == User.id
+        )
+
         conditions = []
-        
+
         if user_id:
             conditions.append(AuditLog.user_id == user_id)
-        
+
         if tool_name:
             conditions.append(AuditLog.tool_name == tool_name)
-        
+
         if start_date:
             conditions.append(AuditLog.timestamp >= start_date)
-        
+
         if end_date:
             conditions.append(AuditLog.timestamp <= end_date)
-        
+
         if conditions:
             query = query.where(and_(*conditions))
-        
+
         # 키워드 검색 (response JSONB를 텍스트로 변환 후 검색)
         if keyword:
             query = query.where(
                 AuditLog.response.cast(text("TEXT")).ilike(f"%{keyword}%")
             )
-        
+
         query = query.order_by(AuditLog.timestamp.desc())
         query = query.limit(limit).offset(offset)
-        
+
         result = await self.db.execute(query)
-        return result.scalars().all()
+        rows = result.all()
+
+        # AuditLog 객체에 user 정보 동적 추가
+        logs_with_users = []
+        for audit_log, user in rows:
+            # 동적으로 user 정보 추가
+            audit_log.user_email = user.email if user else None
+            audit_log.user_name = user.name if user else None
+            logs_with_users.append(audit_log)
+
+        return logs_with_users
     
     async def get_log_by_id(self, log_id: uuid.UUID) -> Optional[AuditLog]:
         """ID로 로그 상세 조회"""
