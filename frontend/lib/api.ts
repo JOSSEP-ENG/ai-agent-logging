@@ -106,6 +106,23 @@ export interface ConnectionTestResult {
   error?: string;
 }
 
+export interface ToolPermission {
+  id: string;
+  user_id: string;
+  connection_id: string;
+  tool_name: string;
+  permission_type: 'allowed' | 'blocked' | 'approval_required';
+  param_constraints?: Record<string, any>;
+  expires_at?: string;
+  created_at: string;
+}
+
+export interface ConnectionTools {
+  connection_id: string;
+  connection_name: string;
+  tools: string[];
+}
+
 // ============ API 에러 ============
 
 export class ApiError extends Error {
@@ -329,6 +346,54 @@ export const adminApi = {
       method: 'PATCH',
       body: JSON.stringify({ role }),
     });
+  },
+
+  // Tool 권한 관리 API
+  async getUserToolPermissions(
+    userId: string,
+    connectionId?: string
+  ): Promise<ToolPermission[]> {
+    const params = connectionId ? `?connection_id=${connectionId}` : '';
+    return fetchApi(`/api/admin/mcp/permissions/${userId}${params}`);
+  },
+
+  async setToolPermission(
+    userId: string,
+    data: {
+      connection_id: string;
+      tool_name: string;
+      permission_type: 'allowed' | 'blocked';
+      param_constraints?: Record<string, any>;
+      expires_at?: string;
+    }
+  ): Promise<ToolPermission> {
+    return fetchApi(`/api/admin/mcp/permissions/${userId}/tools`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async bulkSetToolPermissions(
+    userId: string,
+    data: {
+      connection_id: string;
+      tool_permissions: Record<string, 'allowed' | 'blocked'>;
+    }
+  ): Promise<ToolPermission[]> {
+    return fetchApi(`/api/admin/mcp/permissions/${userId}/bulk`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deleteToolPermission(permissionId: string): Promise<void> {
+    return fetchApi(`/api/admin/mcp/permissions/${permissionId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  async getConnectionTools(connectionId: string): Promise<ConnectionTools> {
+    return fetchApi(`/api/admin/mcp/connections/${connectionId}/tools`);
   },
 };
 
