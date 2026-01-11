@@ -12,8 +12,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import get_db
 from app.models.user import User, UserRole
+from app.models.mcp_tool_permission import PermissionType
 from app.auth.dependencies import require_admin, require_auditor
 from app.admin.service import AdminService
+from app.mcp_gateway.permission_service import ToolPermissionService
 
 
 router = APIRouter(prefix="/api/admin", tags=["Admin"])
@@ -94,6 +96,40 @@ class SystemSettingResponse(BaseModel):
     key: str
     value: Any
     description: str
+
+
+class ToolPermissionResponse(BaseModel):
+    """Tool 권한 응답"""
+    id: str
+    user_id: str
+    connection_id: str
+    tool_name: str
+    permission_type: str
+    param_constraints: Optional[Dict[str, Any]] = None
+    expires_at: Optional[str] = None
+    created_at: str
+
+
+class SetToolPermissionRequest(BaseModel):
+    """Tool 권한 설정 요청"""
+    connection_id: str
+    tool_name: str
+    permission_type: str  # "allowed" or "blocked"
+    param_constraints: Optional[Dict[str, Any]] = None
+    expires_at: Optional[str] = None
+
+
+class BulkSetPermissionsRequest(BaseModel):
+    """일괄 권한 설정 요청"""
+    connection_id: str
+    tool_permissions: Dict[str, str]  # {tool_name: permission_type}
+
+
+class ConnectionToolsResponse(BaseModel):
+    """연결의 Tool 목록 응답"""
+    connection_id: str
+    connection_name: str
+    tools: List[str]
 
 
 # ============ 대시보드 API ============
@@ -383,20 +419,20 @@ async def get_detailed_health(
     db: AsyncSession = Depends(get_db),
 ):
     """상세 시스템 상태 (Admin)
-    
+
     데이터베이스 연결, MCP 연결 등 상세 상태를 확인합니다.
     """
     from app.config import get_settings
-    
+
     settings = get_settings()
-    
+
     # DB 연결 확인
     db_status = "connected"
     try:
         await db.execute("SELECT 1")
     except Exception as e:
         db_status = f"error: {str(e)}"
-    
+
     # MCP 연결 확인
     mcp_status = {}
     try:
@@ -406,7 +442,7 @@ async def get_detailed_health(
                 mcp_status[conn.name] = "enabled" if conn.enabled else "disabled"
     except Exception:
         pass
-    
+
     return {
         "status": "healthy" if db_status == "connected" else "degraded",
         "timestamp": datetime.utcnow().isoformat(),
@@ -421,3 +457,188 @@ async def get_detailed_health(
             "audit_log_retention_days": settings.audit_log_retention_days,
         },
     }
+
+
+# ============ Tool 권한 관리 API (Admin) ============
+
+@router.get("/mcp/permissions/{user_id}", response_model=List[ToolPermissionResponse])
+async def get_user_tool_permissions(
+    user_id: UUID,
+    connection_id: Optional[UUID] = Query(None, description="특정 연결만 조회"),
+    current_user: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """사용자의 Tool 권한 조회
+
+    특정 사용자가 가진 모든 Tool 권한을 조회합니다.
+    """
+    service = ToolPermissionService(db)
+    permissions = await service.get_user_permissions(user_id, connection_id)
+
+    return [
+        ToolPermissionResponse(
+            id=str(p.id),
+            user_id=str(p.user_id),
+            connection_id=str(p.connection_id),
+            tool_name=p.tool_name,
+            permission_type=p.permission_type.value,
+            param_constraints=p.param_constraints,
+            expires_at=p.expires_at.isoformat() if p.expires_at else None,
+            created_at=p.created_at.isoformat(),
+        )
+        for p in permissions
+    ]
+
+
+@router.post("/mcp/permissions/{user_id}/tools", response_model=ToolPermissionResponse)
+async def set_tool_permission(
+    user_id: UUID,
+    request: SetToolPermissionRequest,
+    current_user: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Tool 권한 설정 (생성 또는 업데이트)
+
+    사용자에게 특정 Tool에 대한 권한을 부여하거나 차단합니다.
+    """
+    service = ToolPermissionService(db)
+
+    # permission_type 문자열을 Enum으로 변환
+    try:
+        permission_type = PermissionType(request.permission_type)
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail=f"잘못된 권한 유형: {request.permission_type}. 'allowed' 또는 'blocked'를 사용하세요.",
+        )
+
+    # expires_at 문자열을 datetime으로 변환
+    expires_at = None
+    if request.expires_at:
+        try:
+            expires_at = datetime.fromisoformat(request.expires_at.replace("Z", "+00:00"))
+        except ValueError:
+            raise HTTPException(status_code=400, detail="잘못된 날짜 형식")
+
+    permission = await service.set_permission(
+        user_id=user_id,
+        connection_id=UUID(request.connection_id),
+        tool_name=request.tool_name,
+        permission_type=permission_type,
+        created_by=current_user.id,
+        param_constraints=request.param_constraints,
+        expires_at=expires_at,
+    )
+
+    return ToolPermissionResponse(
+        id=str(permission.id),
+        user_id=str(permission.user_id),
+        connection_id=str(permission.connection_id),
+        tool_name=permission.tool_name,
+        permission_type=permission.permission_type.value,
+        param_constraints=permission.param_constraints,
+        expires_at=permission.expires_at.isoformat() if permission.expires_at else None,
+        created_at=permission.created_at.isoformat(),
+    )
+
+
+@router.post("/mcp/permissions/{user_id}/bulk", response_model=List[ToolPermissionResponse])
+async def bulk_set_tool_permissions(
+    user_id: UUID,
+    request: BulkSetPermissionsRequest,
+    current_user: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """여러 Tool의 권한을 일괄 설정
+
+    한 번의 요청으로 여러 Tool의 권한을 동시에 설정합니다.
+    """
+    service = ToolPermissionService(db)
+
+    # permission_type 문자열을 Enum으로 변환
+    tool_permissions = {}
+    for tool_name, perm_str in request.tool_permissions.items():
+        try:
+            tool_permissions[tool_name] = PermissionType(perm_str)
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail=f"잘못된 권한 유형: {perm_str}",
+            )
+
+    permissions = await service.bulk_set_permissions(
+        user_id=user_id,
+        connection_id=UUID(request.connection_id),
+        tool_permissions=tool_permissions,
+        created_by=current_user.id,
+    )
+
+    return [
+        ToolPermissionResponse(
+            id=str(p.id),
+            user_id=str(p.user_id),
+            connection_id=str(p.connection_id),
+            tool_name=p.tool_name,
+            permission_type=p.permission_type.value,
+            param_constraints=p.param_constraints,
+            expires_at=p.expires_at.isoformat() if p.expires_at else None,
+            created_at=p.created_at.isoformat(),
+        )
+        for p in permissions
+    ]
+
+
+@router.delete("/mcp/permissions/{permission_id}")
+async def delete_tool_permission(
+    permission_id: UUID,
+    current_user: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Tool 권한 삭제
+
+    특정 Tool 권한을 삭제합니다.
+    """
+    service = ToolPermissionService(db)
+    success = await service.delete_permission(permission_id)
+
+    if not success:
+        raise HTTPException(status_code=404, detail="권한을 찾을 수 없습니다")
+
+    return {"message": "권한이 삭제되었습니다"}
+
+
+@router.get("/mcp/connections/{connection_id}/tools", response_model=ConnectionToolsResponse)
+async def get_connection_tools(
+    connection_id: UUID,
+    current_user: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """특정 MCP 연결의 Tool 목록 조회
+
+    MCP 연결에서 사용 가능한 모든 Tool 목록을 반환합니다.
+    """
+    from app.mcp_gateway.connection_service import MCPConnectionService
+
+    conn_service = MCPConnectionService(db)
+    perm_service = ToolPermissionService(db)
+
+    # 연결 정보 조회 (어떤 사용자의 연결이든 관리자는 조회 가능)
+    # TODO: 실제로는 admin이므로 모든 연결 조회 가능하도록 수정 필요
+    # 현재는 임시로 connection_id로만 조회
+    from app.models.mcp_connection import MCPConnection
+    from sqlalchemy import select
+
+    query = select(MCPConnection).where(MCPConnection.id == connection_id)
+    result = await db.execute(query)
+    connection = result.scalar_one_or_none()
+
+    if not connection:
+        raise HTTPException(status_code=404, detail="연결을 찾을 수 없습니다")
+
+    tools = await perm_service.get_connection_tools(connection_id)
+
+    return ConnectionToolsResponse(
+        connection_id=str(connection.id),
+        connection_name=connection.name,
+        tools=tools,
+    )

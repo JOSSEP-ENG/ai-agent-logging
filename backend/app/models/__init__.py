@@ -3,6 +3,7 @@ from .audit import AuditLog, AuditStatus
 from .chat import ChatSession, ChatMessage
 from .user import User, UserRole
 from .mcp_connection import MCPConnection
+from .mcp_tool_permission import MCPToolPermission, PermissionType
 
 __all__ = [
     "Base",
@@ -17,4 +18,6 @@ __all__ = [
     "User",
     "UserRole",
     "MCPConnection",
+    "MCPToolPermission",
+    "PermissionType",
 ]
