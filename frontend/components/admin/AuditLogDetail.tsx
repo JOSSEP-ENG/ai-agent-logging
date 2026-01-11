@@ -8,6 +8,8 @@ interface AuditLog {
   id: string;
   timestamp: string;
   user_id: string;
+  user_email?: string;
+  user_name?: string;
   session_id?: string;
   user_query?: string;
   tool_name: string;
@@ -46,7 +48,25 @@ export function AuditLogDetail({ log, onClose }: Props) {
             <div className="grid grid-cols-2 gap-4">
               <InfoField label="로그 ID" value={log.id} />
               <InfoField label="타임스탬프" value={formatDateTime(log.timestamp)} />
-              <InfoField label="사용자 ID" value={log.user_id} />
+              <div>
+                <p className="text-xs text-dark-500 mb-1">사용자</p>
+                {log.user_email ? (
+                  <div>
+                    <p className="text-dark-200 text-sm font-medium">
+                      {log.user_email}
+                    </p>
+                    {log.user_name && (
+                      <p className="text-dark-400 text-xs mt-0.5">
+                        {log.user_name}
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-dark-200 text-sm font-mono">
+                    {log.user_id}
+                  </p>
+                )}
+              </div>
               <InfoField label="세션 ID" value={log.session_id || '-'} />
               <InfoField label="Tool 이름" value={log.tool_name} />
               <InfoField label="실행 시간" value={log.execution_time_ms ? `${log.execution_time_ms}ms` : '-'} />

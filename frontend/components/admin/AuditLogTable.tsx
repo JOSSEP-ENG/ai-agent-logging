@@ -7,6 +7,8 @@ interface AuditLog {
   id: string;
   timestamp: string;
   user_id: string;
+  user_email?: string;
+  user_name?: string;
   tool_name: string;
   status: 'success' | 'fail' | 'denied';
   execution_time_ms?: string;
@@ -68,8 +70,21 @@ export function AuditLogTable({ logs, isLoading, onRowClick }: Props) {
                 <td className="py-3 px-4 text-dark-200">
                   {formatDateTime(log.timestamp)}
                 </td>
-                <td className="py-3 px-4 text-dark-300 font-mono text-sm">
-                  {log.user_id}
+                <td className="py-3 px-4 text-dark-200">
+                  {log.user_email ? (
+                    <div>
+                      <div className="font-medium">{log.user_email}</div>
+                      {log.user_name && (
+                        <div className="text-xs text-dark-400 mt-0.5">
+                          {log.user_name}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-dark-400 font-mono text-sm">
+                      {log.user_id}
+                    </span>
+                  )}
                 </td>
                 <td className="py-3 px-4 text-dark-200 font-mono text-sm">
                   {log.tool_name}
